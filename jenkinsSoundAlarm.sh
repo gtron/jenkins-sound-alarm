@@ -18,6 +18,7 @@ DIR=$(dirname $0)
 LOG_FILE="$DIR/failure_${JOB}.log"
 FAILURE_FILE="$DIR/failure_${JOB}.failed"
 SNOOZE_FILE="$DIR/failure_${JOB}.snooze"
+PID_FILE="$DIR/failure_${JOB}.pid"
 
 # -------------------------------------------------------------
 
@@ -73,7 +74,6 @@ exit -1
 
 }
 
-
 while [[ $# > 0 && "$1" =~ -* ]]
 do
 key="$1"
@@ -125,6 +125,40 @@ function log {
  [ -z $DEBUG ] || echo $@
  echo -e "$@" >> $LOG_FILE
 }
+
+function checkAlreadyRunning {
+
+  mypid=$$
+
+  if [ -f $PID_FILE ]; then
+    oldPid=$(cat $PID_FILE)
+
+    kill -0 $oldPid 2>1 /dev/null
+    RET=$?
+    if [ $RET == 0 ]; then
+        log 'Already running ! Exiting ...'
+        doExit 1
+    else
+        log 'Found PidFile but NOT Running ! Cleaning file ... '
+        rm $PID_FILE
+    fi
+  fi
+  log 'Creating PID File ... '
+  echo $mypid >> $PID_FILE
+
+}
+
+function doExit {
+  if [[ -z $1 || "$1" = "0" ]]; then
+   log "Cleaning PID FILE"
+   rm $PID_FILE
+  fi
+
+  log Exiting
+  exit $1
+}
+
+checkAlreadyRunning
 
 log " --- $(date) "
 
@@ -271,3 +305,5 @@ while [[ "$RES" != 0 && $COUNTER -lt $MAX_RETRIES ]]; do
 	RES=$?
 #fi
 done
+
+doExit
